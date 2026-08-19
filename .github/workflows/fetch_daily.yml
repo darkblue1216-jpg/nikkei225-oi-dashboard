@@ -1,0 +1,37 @@
+name: Fetch daily open interest
+
+on:
+  schedule:
+    # 21:00 JST = 12:00 UTC、平日のみ（JPXの掲載予定時刻20:00の後にバッファを持たせている）
+    - cron: "0 12 * * 1-5"
+  workflow_dispatch: {}
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install openpyxl
+
+      - name: Fetch today's open interest
+        run: python fetch_open_interest.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "変更なし（データ未更新、または既に取得済み）"
+          else
+            git commit -m "data: $(date -u +%Y-%m-%d) 建玉残高を更新"
+            git push
+          fi
