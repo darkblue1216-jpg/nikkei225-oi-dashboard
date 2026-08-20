@@ -70,11 +70,24 @@ def load_history(dates):
 
 
 def fmt_contract_label(product, contract):
+    """
+    標準オプションのcontractは"YYMM"（限月そのもの）。
+    ミニオプションのcontractは"YYMMDD"だが、これはSQ日ではなく「取引最終日」を表す
+    JPXの内部コード（金曜限月なら前営業日=木曜、水曜限月なら前営業日=火曜が最終取引日
+    になる規則に対応）。SQ日は基本的に最終取引日の翌暦日だが、祝日を挟む場合はズレる
+    可能性があるため、ここでは参考表示として（推定）と明記する。
+    """
     if product == "standard":
         yy, mm = contract[:2], contract[2:]
         return f"20{yy}年{int(mm):02d}月限"
     yy, mm, dd = contract[:2], contract[2:4], contract[4:]
-    return f"20{yy}-{mm}-{dd}限（週次）"
+    try:
+        import datetime as _dt
+        last_trade_day = _dt.date(2000 + int(yy), int(mm), int(dd))
+        est_sq = last_trade_day + _dt.timedelta(days=1)
+        return f"最終取引日20{yy}-{mm}-{dd}（週次、推定SQ日{est_sq.month}/{est_sq.day}）"
+    except ValueError:
+        return f"最終取引日20{yy}-{mm}-{dd}（週次）"
 
 
 # ============================================================
