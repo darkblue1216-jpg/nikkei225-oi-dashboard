@@ -15,7 +15,7 @@ JPXの「デリバティブ建玉残高表」から日経225オプション・�
   各シートの行は "NIKKEI 225 P2609-20000"（通常）/ "NK225 MINI P260820-58375"（ミニ）
   という形式の銘柄名＋続く4列（取引高, 当日建玉残高, 前日比, 前日建玉残高）。
 
-保存先: data/oi_{YYYYMMDD}.csv （日次スナップショット、後続のダッシュボードが積み上げて使う）
+保存先: data/oi_history/{YYYY-MM-DD}.csv （日次スナップショット、後続のダッシュボードが積み上げて使う）
 """
 import csv
 import datetime as dt
@@ -28,6 +28,7 @@ UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML,
 INDEX_URL = "https://www.jpx.co.jp/markets/derivatives/trading-volume/index.html"
 BASE = os.path.dirname(__file__)
 DATA_DIR = os.path.join(BASE, "data")
+HISTORY_DIR = os.path.join(DATA_DIR, "oi_history")
 
 CODE_RE = re.compile(r"^(NIKKEI 225|NK225 MINI)\s+([PC])(\S+)-(\d+)$")
 
@@ -111,7 +112,9 @@ def main():
     for r in rows:
         r["report_date"] = report_date
 
-    out_path = os.path.join(DATA_DIR, f"oi_{report_date}.csv")
+    iso_date = f"{report_date[:4]}-{report_date[4:6]}-{report_date[6:]}"
+    os.makedirs(HISTORY_DIR, exist_ok=True)
+    out_path = os.path.join(HISTORY_DIR, f"{iso_date}.csv")
     fieldnames = ["report_date", "product", "put_call", "contract", "strike", "volume", "oi", "oi_change", "oi_prev"]
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames)
