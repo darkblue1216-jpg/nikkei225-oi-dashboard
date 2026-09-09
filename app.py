@@ -30,7 +30,13 @@ COLORS = {
     "grid": "#21262d",
     "up": "#3fb950",
     "down": "#f85149",
+    # C-P差分チャート専用配色（参考画像に合わせる: コール優位=青、プット優位=オレンジ）
+    "cp_call_dominant": "#3b82f6",
+    "cp_put_dominant": "#f97316",
+    "current_price": "#e6edf3",
 }
+
+RANGE_WIDTH_OPTIONS = [5000, 10000, 15000, 20000]
 
 BASE = os.path.dirname(__file__)
 DATA_DIR = os.path.join(BASE, "data")
@@ -96,7 +102,7 @@ def fmt_contract_label(product, contract):
 # ============================================================
 # チャート
 # ============================================================
-def oi_bar_chart(df, product, contract, position_strikes=None):
+def oi_bar_chart(df, product, contract, position_strikes=None, price_range=None):
     d = df[(df["product"] == product) & (df["contract"] == contract)].copy()
     if d.empty:
         fig = go.Figure()
@@ -119,6 +125,10 @@ def oi_bar_chart(df, product, contract, position_strikes=None):
                               annotation_text=label, annotation_font_color=COLORS["position"],
                               annotation_position="top")
 
+    xaxis_opts = dict(gridcolor=COLORS["grid"])
+    if price_range:
+        xaxis_opts["range"] = list(price_range)
+
     fig.update_layout(
         barmode="overlay",
         title=dict(text=f"権利行使価格別 建玉残高（{fmt_contract_label(product, contract)}）",
@@ -130,7 +140,7 @@ def oi_bar_chart(df, product, contract, position_strikes=None):
         plot_bgcolor=COLORS["panel"],
         font=dict(color=COLORS["text"]),
         legend=dict(orientation="h", y=1.08),
-        xaxis=dict(gridcolor=COLORS["grid"]),
+        xaxis=xaxis_opts,
         yaxis=dict(gridcolor=COLORS["grid"]),
         margin=dict(l=50, r=20, t=70, b=40),
     )
@@ -157,6 +167,85 @@ def oi_change_bar_chart(df, product, contract, top_n=20):
         font=dict(color=COLORS["text"]), showlegend=False,
         xaxis=dict(gridcolor=COLORS["grid"]), yaxis=dict(gridcolor=COLORS["grid"]),
         margin=dict(l=50, r=20, t=50, b=60),
+    )
+    return fig
+
+
+def cp_diff_series(df, product, contract):
+    """権利行使価格ごとの C-P（コール建玉残高 - プット建玉残高）を計算する。"""
+    d = df[(df["product"] == product) & (df["contract"] == contract)]
+    if d.empty:
+        return pd.DataFrame(columns=["strike", "call_oi", "put_oi", "cp"])
+    g = d.groupby(["strike", "put_call"])["oi"].sum().unstack(fill_value=0)
+    for col in ("Call", "Put"):
+        if col not in g.columns:
+            g[col] = 0
+    g = g.rename(columns={"Call": "call_oi", "Put": "put_oi"}).reset_index()
+    g["cp"] = g["call_oi"] - g["put_oi"]
+    return g.sort_values("strike")
+
+
+def cp_diff_bar_chart(df, product, contract, current_price=None, range_width=None, position_strikes=None):
+    """
+    C-P差分（コール建玉残高-プット建玉残高）の横向きバーチャート。
+    ストライクを縦軸（降順=上が高い価格）、C-Pを横軸に取り、現在値近辺のC-Pバランスを一目で見せる。
+    """
+    g = cp_diff_series(df, product, contract)
+    if g.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="データなし", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        return fig
+
+    if current_price is not None and range_width is not None:
+        g = g[(g["strike"] >= current_price - range_width) & (g["strike"] <= current_price + range_width)]
+    if g.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="表示レンジ内にデータがありません（レンジを広げてください）",
+                            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        return fig
+
+    g = g.sort_values("strike")  # 数値y軸なので昇順で渡せば上に高い価格が来る
+    colors = [COLORS["cp_call_dominant"] if v >= 0 else COLORS["cp_put_dominant"] for v in g["cp"]]
+    customdata = g[["call_oi", "put_oi"]].to_numpy()
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=g["cp"], y=g["strike"], orientation="h",
+        marker_color=colors, customdata=customdata,
+        hovertemplate=(
+            "権利行使価格: %{y:,}円<br>"
+            "コール残: %{customdata[0]:,.0f}枚<br>"
+            "プット残: %{customdata[1]:,.0f}枚<br>"
+            "C-P: %{x:,.0f}枚<extra></extra>"
+        ),
+    ))
+    fig.add_vline(x=0, line_color=COLORS["grid"], line_width=1)
+
+    if current_price is not None:
+        fig.add_hline(y=current_price, line_color=COLORS["current_price"], line_width=1.5, line_dash="dash",
+                      annotation_text=f"現在値 {current_price:,.2f}", annotation_font_color=COLORS["current_price"],
+                      annotation_position="top right")
+
+    if position_strikes:
+        for label, strike in position_strikes:
+            if strike:
+                fig.add_hline(y=strike, line_color=COLORS["position"], line_width=1, line_dash="dot",
+                              annotation_text=label, annotation_font_color=COLORS["position"],
+                              annotation_position="bottom right")
+
+    fig.update_layout(
+        title=dict(text=f"C-P差分（コール残-プット残） {fmt_contract_label(product, contract)}",
+                    font=dict(size=14, color=COLORS["text"])),
+        xaxis_title="C-P（枚）　※青=コール優位／オレンジ=プット優位",
+        yaxis_title="権利行使価格（円）",
+        height=560,
+        paper_bgcolor=COLORS["bg"],
+        plot_bgcolor=COLORS["panel"],
+        font=dict(color=COLORS["text"]),
+        showlegend=False,
+        xaxis=dict(gridcolor=COLORS["grid"]),
+        yaxis=dict(gridcolor=COLORS["grid"], tickformat=",", dtick=max(int(g["strike"].diff().median() or 250), 1)),
+        margin=dict(l=70, r=20, t=70, b=40),
     )
     return fig
 
@@ -357,6 +446,18 @@ def main():
                                  format_func=lambda c: fmt_contract_label(product, c) if c else c)
 
         st.markdown("---")
+        st.markdown("**表示レンジ**")
+        _default_center, _ = compute_max_pain(df_snap, product, contract) if not df_snap.empty else (None, None)
+        current_price = st.number_input(
+            "現在値（日経225、目安）", value=float(_default_center) if _default_center else 0.0,
+            step=5.0, format="%.2f",
+            help="C-P差分チャートの中心と、両チャートの表示レンジ絞り込みに使う目安の現在値。"
+                 "デフォルトはマックスペイン価格を仮置きしているので、実際の値に書き換えてください。",
+        )
+        range_width = st.selectbox("表示レンジ幅（現在値±）", options=RANGE_WIDTH_OPTIONS, index=2,
+                                    format_func=lambda w: f"±{w:,}円")
+
+        st.markdown("---")
         st.markdown("**自分のポジション（権利行使価格）**")
         show_position = st.checkbox("チャートに重ねて表示", value=True)
         put_long = st.number_input("プット買い", value=0, step=250)
@@ -409,7 +510,21 @@ def main():
 
     st.markdown("---")
 
-    st.plotly_chart(oi_bar_chart(df_snap, product, contract, position_strikes), use_container_width=True, key="oi_bar")
+    price_range = (current_price - range_width, current_price + range_width) if current_price > 0 else None
+    center_price = current_price if current_price > 0 else None
+
+    st.plotly_chart(oi_bar_chart(df_snap, product, contract, position_strikes, price_range=price_range),
+                     use_container_width=True, key="oi_bar")
+
+    st.plotly_chart(
+        cp_diff_bar_chart(df_snap, product, contract, current_price=center_price, range_width=range_width,
+                           position_strikes=position_strikes),
+        use_container_width=True, key="cp_diff",
+    )
+    st.caption(
+        "C-P差分＝コール建玉残高－プット建玉残高。青（正）＝コール優位、オレンジ（負）＝プット優位。"
+        "サイドバーの「現在値」「表示レンジ幅」でこのチャートと上の権利行使価格別建玉残高チャートの表示範囲を調整できます。"
+    )
 
     col_a, col_b = st.columns(2)
     with col_a:
