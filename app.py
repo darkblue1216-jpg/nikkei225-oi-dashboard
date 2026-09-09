@@ -244,7 +244,7 @@ def cp_diff_bar_chart(df, product, contract, current_price=None, range_width=Non
         font=dict(color=COLORS["text"]),
         showlegend=False,
         xaxis=dict(gridcolor=COLORS["grid"]),
-        yaxis=dict(gridcolor=COLORS["grid"], tickformat=",", dtick=max(int(g["strike"].diff().median() or 250), 1)),
+        yaxis=dict(gridcolor=COLORS["grid"], tickformat=",", nticks=20),
         margin=dict(l=70, r=20, t=70, b=40),
     )
     return fig
