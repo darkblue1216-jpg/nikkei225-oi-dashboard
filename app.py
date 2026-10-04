@@ -3,6 +3,7 @@
 データ: JPX「デリバティブ建玉残高表」(https://www.jpx.co.jp/markets/derivatives/trading-volume/)
 """
 import glob
+import importlib
 import os
 import re
 from datetime import datetime
@@ -10,6 +11,9 @@ from datetime import datetime
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+
+# 2026-10-04追加分（ファイル名が日付プレフィックス付きのためimportlibで読み込む）
+views = importlib.import_module("261004_views")
 
 st.set_page_config(
     page_title="日経225オプション 建玉残高ダッシュボード",
@@ -421,6 +425,138 @@ def max_pain_trend_chart(history_df, product, contract):
 # ============================================================
 # メイン UI
 # ============================================================
+# ============================================================
+# 2026-10-04追加: 建玉の増減 / ガンママップ / 手口（ラージオプション）
+# ============================================================
+VIEW_WIDTH_OPTIONS = [2000, 3000, 5000, 10000]
+
+
+def _view_width(key):
+    return st.selectbox("表示幅（現在値±）", options=VIEW_WIDTH_OPTIONS, index=2, key=key,
+                        format_func=lambda w: f"±{w:,}円")
+
+
+def render_oi_change_tab(df_snap, dates, selected_date, spot):
+    """Phase 1: 期近・次限月のストライク別建玉、前日比、直近5営業日の推移、上位5ストライク。"""
+    contracts = views.near_contracts(df_snap, selected_date)
+    if not contracts or spot <= 0:
+        st.warning("期近・次限月の建玉データ、または現在値が取得できません。")
+        return
+    width = _view_width("w_oi")
+    xr = (spot - width, spot + width)
+    recent = [d for d in dates if d <= selected_date][-5:]
+    snaps = {d: load_snapshot(d) for d in recent}
+    st.caption(f"ラージオプション（通常）。現在値 {spot:,.0f} 円、基準日 {selected_date}。"
+               f"ヒートマップは直近{len(recent)}営業日（{recent[0]}〜{recent[-1]}）。")
+    for contract in contracts:
+        st.subheader(views.label(contract, selected_date))
+        st.plotly_chart(views.oi_bars(df_snap, contract, spot, xr), use_container_width=True, key=f"p1_bar_{contract}")
+        st.plotly_chart(views.oi_change_bars(df_snap, contract, spot, xr), use_container_width=True,
+                        key=f"p1_chg_{contract}")
+        h1, h2 = st.columns(2)
+        h1.plotly_chart(views.oi_heatmap(snaps, contract, "Call", spot, xr), use_container_width=True,
+                        key=f"p1_hc_{contract}")
+        h2.plotly_chart(views.oi_heatmap(snaps, contract, "Put", spot, xr), use_container_width=True,
+                        key=f"p1_hp_{contract}")
+        t1, t2 = st.columns(2)
+        t1.markdown("**コール建玉 上位5ストライク**")
+        t1.dataframe(views.top5_table(df_snap, contract, "Call"), hide_index=True, use_container_width=True)
+        t2.markdown("**プット建玉 上位5ストライク**")
+        t2.dataframe(views.top5_table(df_snap, contract, "Put"), hide_index=True, use_container_width=True)
+        st.markdown("---")
+
+
+def render_gamma_tab(df_snap, selected_date, spot):
+    """Phase 3 モデルA: 符号なしのガンママップと加速ポイント候補。モデルBは作らない。"""
+    st.warning(
+        "**ヘッジの向き（買いになるか売りになるか）は分かりません。** このマップは建玉の大きさだけを使った"
+        "「どこにヘッジが集中しやすいか」の地図（モデルA・符号なし）です。誰がどちら側のポジションを持っているかは、"
+        "公開データから現在値±2,000円の範囲では特定できないため、符号付きのモデルBは作っていません。"
+    )
+    contracts = views.near_contracts(df_snap, selected_date)
+    iv = views.load_iv(selected_date)
+    if not contracts or spot <= 0:
+        st.warning("期近・次限月の建玉データ、または現在値が取得できません。")
+        return
+    if iv.empty:
+        st.warning(f"{selected_date} のIVデータがありません（data/iv_history/）。")
+        return
+    table = views.gm.build_gamma_table(df_snap, iv, contracts, selected_date, spot)
+    strike_table = views.gm.by_strike(table)
+    cands = views.gm.acceleration_candidates(strike_table, spot)
+    width = _view_width("w_gamma")
+    xr = (spot - width, spot + width)
+
+    st.plotly_chart(views.gamma_map_chart(strike_table, spot, cands, xr), use_container_width=True, key="gamma_map")
+    st.subheader(f"加速ポイント候補（現在値 {spot:,.0f} 円の±{views.gm.CANDIDATE_WINDOW_YEN:,}円、上位{views.gm.CANDIDATE_TOP_N}）")
+    st.dataframe(views.candidates_table(cands), hide_index=True, use_container_width=True)
+    st.caption(
+        f"対象限月: {' / '.join(views.label(c, selected_date) for c in contracts)}（合算）。"
+        "ヘッジ量の目安 ＝ ガンマ × 建玉 × 取引単位（ラージ1,000倍）× 100円。"
+        "ガンマはブラック・ショールズ（配当なし、金利1.08%）、IVはJPX理論価格フィードのボラティリティ"
+        "（コール・プットそれぞれのIV）。SQ日は各月の第2金曜として計算（祝日による前倒しは未考慮）。"
+        "ミニオプションはIVフィードに無いため対象外。"
+    )
+    with st.expander("限月別の内訳"):
+        t = table[["contract", "strike", "call_oi", "put_oi", "call_iv", "put_iv", "hedge", "futures_large"]].copy()
+        t = t[(t["strike"] >= xr[0]) & (t["strike"] <= xr[1])].sort_values(["contract", "strike"])
+        st.dataframe(t, hide_index=True, use_container_width=True)
+
+
+def render_participant_tab(df_snap, selected_date, spot):
+    """Phase 2（限定版）: 日次の手口（取引高のみ）と、週次の売超/買超（ATM近傍5ストライクのみ）。"""
+    st.warning(
+        "**日次の手口は取引高だけで、売り買いの向きは公開されていません（向きは不明）。** "
+        "「業者側」に分類した参加者の取引高が多いストライクを示すだけで、業者が売り越しかどうかは分かりません。"
+        "売超/買超が分かるのは週次の参加者別建玉残高だけですが、期近限月のATM近傍5ストライクしか載りません。"
+    )
+    contracts = views.near_contracts(df_snap, selected_date)
+    vol = views.pt.load_volume(selected_date)
+    width = _view_width("w_part")
+    xr = (spot - width, spot + width) if spot > 0 else (0, 200000)
+
+    st.subheader("日次: 取引高上位の参加者（取引高のみ・向き不明）")
+    if vol.empty:
+        st.info(f"{selected_date} の手口データがありません。")
+    else:
+        session = st.radio("セッション", ["day", "night"], horizontal=True,
+                           format_func=lambda s: "日中立会" if s == "day" else "ナイト")
+        st.plotly_chart(views.volume_by_group_chart(vol, contracts, spot, xr, session), use_container_width=True,
+                        key="p2_vol")
+        rank = views.volume_ranking_table(vol, contracts, session)
+        if rank.empty:
+            st.info("この範囲・セッションに掲載銘柄がありません。")
+        else:
+            st.dataframe(rank, hide_index=True, use_container_width=True)
+        st.caption("手口に載るのはその日の取引高が大きい銘柄（8〜18銘柄程度）で、遠いストライクはほぼ載りません。"
+                   "取引高はランキング掲載分（上位参加者）の合計で、全体の取引高ではありません。")
+
+    st.subheader("週次: 売超/買超の参加者（期近限月・ATM近傍5ストライク）")
+    weekly = views.pt.load_weekly()
+    if weekly.empty:
+        st.info("週次の参加者別建玉残高がありません。")
+    else:
+        avail = sorted(weekly["asof_date"].unique())
+        avail = [a for a in avail if a.strftime("%Y-%m-%d") <= selected_date] or avail
+        asof = st.selectbox("基準週（金曜時点）", options=list(reversed(avail)),
+                            format_func=lambda a: a.strftime("%Y-%m-%d"))
+        wt = views.weekly_net_table(weekly, asof)
+        st.dataframe(wt, hide_index=True, use_container_width=True)
+        dealers = wt[(wt["区分"] == "業者側") & (wt["売超/買超"] == "売超")]
+        if not dealers.empty:
+            s = dealers.groupby(["限月", "P/C", "権利行使価格"])["枚数"].sum().reset_index()
+            st.markdown("**業者側の売超（このATM近傍5ストライクのみ）**")
+            st.dataframe(s, hide_index=True, use_container_width=True)
+        st.caption("公開されるのは売超/買超の上位参加者のみ（最大15位）。業者側以外の参加者、掲載外のストライクは見えません。")
+
+    with st.expander("「業者側」とみなす参加者の一覧（261004_participants.py で変更できます）"):
+        d = views.pt.DEALER_SIDE
+        c = views.pt.CLEARING_BROKERS
+        st.dataframe(pd.DataFrame([{"コード": k, "名称": v, "区分": "業者側"} for k, v in d.items()]
+                                  + [{"コード": k, "名称": v, "区分": "清算業者（別枠）"} for k, v in c.items()]),
+                     hide_index=True, use_container_width=True)
+
+
 def main():
     dates = list_available_dates()
     if not dates:
@@ -447,12 +583,15 @@ def main():
 
         st.markdown("---")
         st.markdown("**表示レンジ**")
+        _underlying = views.underlying_close(selected_date)
         _default_center, _ = compute_max_pain(df_snap, product, contract) if not df_snap.empty else (None, None)
+        _default_price = _underlying if _underlying else (float(_default_center) if _default_center else 0.0)
         current_price = st.number_input(
-            "現在値（日経225、目安）", value=float(_default_center) if _default_center else 0.0,
-            step=5.0, format="%.2f",
-            help="C-P差分チャートの中心と、両チャートの表示レンジ絞り込みに使う目安の現在値。"
-                 "デフォルトはマックスペイン価格を仮置きしているので、実際の値に書き換えてください。",
+            "現在値（日経225、目安）", value=float(_default_price), step=5.0, format="%.2f",
+            key=f"current_price_{selected_date}",
+            help="C-P差分・建玉の増減・ガンママップの中心と表示レンジに使う現在値。"
+                 "初期値は基準日の日経平均終値（JPX理論価格フィードの原資産終値）。"
+                 "終値データが無い日はマックスペイン価格を仮置きするので、実際の値に書き換えてください。",
         )
         range_width = st.selectbox("表示レンジ幅（現在値±）", options=RANGE_WIDTH_OPTIONS, index=2,
                                     format_func=lambda w: f"±{w:,}円")
@@ -495,60 +634,69 @@ def main():
     recent_dates = dates[-lookback:]
     history_df = load_history(recent_dates)
 
-    # サマリーカード
-    d = df_snap[(df_snap["product"] == product) & (df_snap["contract"] == contract)]
-    max_pain_strike, max_pain_loss_df = compute_max_pain(df_snap, product, contract)
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("プット建玉合計", f"{int(d[d['put_call']=='Put']['oi'].sum()):,}枚")
-    col2.metric("コール建玉合計", f"{int(d[d['put_call']=='Call']['oi'].sum()):,}枚")
-    put_call_ratio = (d[d['put_call']=='Put']['oi'].sum() / d[d['put_call']=='Call']['oi'].sum()
-                       if d[d['put_call']=='Call']['oi'].sum() else 0)
-    col3.metric("プット/コール比", f"{put_call_ratio:.2f}")
-    max_call_strike = d[d['put_call']=='Call'].sort_values('oi', ascending=False)['strike'].head(1)
-    col4.metric("コール最大建玉ストライク", f"{int(max_call_strike.iloc[0]):,}円" if len(max_call_strike) else "N/A")
-    col5.metric("マックスペイン価格", f"{max_pain_strike:,}円" if max_pain_strike is not None else "N/A")
+    tabs = st.tabs(["📊 建玉・C-P（既存）", "① 建玉の増減", "② ガンママップ", "③ 手口（限定版）"])
+    with tabs[0]:
+        # サマリーカード
+        d = df_snap[(df_snap["product"] == product) & (df_snap["contract"] == contract)]
+        max_pain_strike, max_pain_loss_df = compute_max_pain(df_snap, product, contract)
+        col1, col2, col3, col4, col5 = st.columns(5)
+        col1.metric("プット建玉合計", f"{int(d[d['put_call']=='Put']['oi'].sum()):,}枚")
+        col2.metric("コール建玉合計", f"{int(d[d['put_call']=='Call']['oi'].sum()):,}枚")
+        put_call_ratio = (d[d['put_call']=='Put']['oi'].sum() / d[d['put_call']=='Call']['oi'].sum()
+                           if d[d['put_call']=='Call']['oi'].sum() else 0)
+        col3.metric("プット/コール比", f"{put_call_ratio:.2f}")
+        max_call_strike = d[d['put_call']=='Call'].sort_values('oi', ascending=False)['strike'].head(1)
+        col4.metric("コール最大建玉ストライク", f"{int(max_call_strike.iloc[0]):,}円" if len(max_call_strike) else "N/A")
+        col5.metric("マックスペイン価格", f"{max_pain_strike:,}円" if max_pain_strike is not None else "N/A")
 
-    st.markdown("---")
+        st.markdown("---")
 
-    price_range = (current_price - range_width, current_price + range_width) if current_price > 0 else None
-    center_price = current_price if current_price > 0 else None
+        price_range = (current_price - range_width, current_price + range_width) if current_price > 0 else None
+        center_price = current_price if current_price > 0 else None
 
-    st.plotly_chart(oi_bar_chart(df_snap, product, contract, position_strikes, price_range=price_range),
-                     use_container_width=True, key="oi_bar")
+        st.plotly_chart(oi_bar_chart(df_snap, product, contract, position_strikes, price_range=price_range),
+                         use_container_width=True, key="oi_bar")
 
-    st.plotly_chart(
-        cp_diff_bar_chart(df_snap, product, contract, current_price=center_price, range_width=range_width,
-                           position_strikes=position_strikes),
-        use_container_width=True, key="cp_diff",
-    )
-    st.caption(
-        "C-P差分＝コール建玉残高－プット建玉残高。青（正）＝コール優位、オレンジ（負）＝プット優位。"
-        "サイドバーの「現在値」「表示レンジ幅」でこのチャートと上の権利行使価格別建玉残高チャートの表示範囲を調整できます。"
-    )
+        st.plotly_chart(
+            cp_diff_bar_chart(df_snap, product, contract, current_price=center_price, range_width=range_width,
+                               position_strikes=position_strikes),
+            use_container_width=True, key="cp_diff",
+        )
+        st.caption(
+            "C-P差分＝コール建玉残高－プット建玉残高。青（正）＝コール優位、オレンジ（負）＝プット優位。"
+            "サイドバーの「現在値」「表示レンジ幅」でこのチャートと上の権利行使価格別建玉残高チャートの表示範囲を調整できます。"
+        )
 
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.plotly_chart(oi_change_bar_chart(df_snap, product, contract), use_container_width=True, key="oi_change")
-    with col_b:
-        trend_strikes = [s for _, s in position_strikes] if position_strikes else []
-        st.plotly_chart(multi_day_trend_chart(history_df, product, contract, trend_strikes), use_container_width=True, key="multi_day_trend")
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.plotly_chart(oi_change_bar_chart(df_snap, product, contract), use_container_width=True, key="oi_change")
+        with col_b:
+            trend_strikes = [s for _, s in position_strikes] if position_strikes else []
+            st.plotly_chart(multi_day_trend_chart(history_df, product, contract, trend_strikes), use_container_width=True, key="multi_day_trend")
 
-    st.markdown("---")
-    st.subheader("📈 追加分析: Put/Call比推移・マックスペイン")
-    col_c, col_d = st.columns(2)
-    with col_c:
-        st.plotly_chart(put_call_ratio_trend_chart(history_df, product, contract), use_container_width=True, key="pc_ratio_trend")
-    with col_d:
-        st.plotly_chart(max_pain_chart(max_pain_loss_df, max_pain_strike, position_strikes), use_container_width=True, key="max_pain")
-    st.plotly_chart(max_pain_trend_chart(history_df, product, contract), use_container_width=True, key="max_pain_trend")
-    st.caption(
-        "マックスペイン理論: 満期の決済価格がその権利行使価格になった場合に、オプション買い手が受け取る"
-        "本質的価値の合計（＝オプション売り手の支払い総額）が最小になる権利行使価格。売り手優位の目安として"
-        "参考程度に見るもので、将来の価格を予測するものではない。"
-    )
+        st.markdown("---")
+        st.subheader("📈 追加分析: Put/Call比推移・マックスペイン")
+        col_c, col_d = st.columns(2)
+        with col_c:
+            st.plotly_chart(put_call_ratio_trend_chart(history_df, product, contract), use_container_width=True, key="pc_ratio_trend")
+        with col_d:
+            st.plotly_chart(max_pain_chart(max_pain_loss_df, max_pain_strike, position_strikes), use_container_width=True, key="max_pain")
+        st.plotly_chart(max_pain_trend_chart(history_df, product, contract), use_container_width=True, key="max_pain_trend")
+        st.caption(
+            "マックスペイン理論: 満期の決済価格がその権利行使価格になった場合に、オプション買い手が受け取る"
+            "本質的価値の合計（＝オプション売り手の支払い総額）が最小になる権利行使価格。売り手優位の目安として"
+            "参考程度に見るもので、将来の価格を予測するものではない。"
+        )
 
-    with st.expander("生データを見る"):
-        st.dataframe(d.sort_values(["put_call", "strike"]), use_container_width=True)
+        with st.expander("生データを見る"):
+            st.dataframe(d.sort_values(["put_call", "strike"]), use_container_width=True)
+
+    with tabs[1]:
+        render_oi_change_tab(df_snap, dates, selected_date, current_price)
+    with tabs[2]:
+        render_gamma_tab(df_snap, selected_date, current_price)
+    with tabs[3]:
+        render_participant_tab(df_snap, selected_date, current_price)
 
     st.markdown("---")
     st.caption(f"データ: JPX「デリバティブ建玉残高表」｜ 蓄積データ日数: {len(dates)}日分（{dates[0]} 〜 {dates[-1]}）")
