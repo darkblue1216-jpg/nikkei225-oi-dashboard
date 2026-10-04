@@ -29,7 +29,8 @@ def _layout(fig, title, height=380, xtitle=None, ytitle=None, legend=False):
         showlegend=legend, margin=dict(l=60, r=20, t=60, b=40),
     )
     if legend:
-        fig.update_layout(legend=dict(orientation="h", y=1.1))
+        # 右寄せ: 現在値の縦線ラベル(上部中央付近)と重ならないようにする
+        fig.update_layout(legend=dict(orientation="h", x=1, xanchor="right", y=1.1))
     return fig
 
 
@@ -78,7 +79,7 @@ def oi_bars(df, contract, spot, xrange):
         s = d[d["put_call"] == pc].sort_values("strike")
         fig.add_trace(go.Bar(x=s["strike"], y=s["oi"], name=name, marker_color=color, opacity=0.85))
     fig.add_vline(x=spot, line_color=C["spot"], line_dash="dash", annotation_text=f"現在値 {spot:,.0f}",
-                  annotation_font_color=C["spot"], annotation_position="top")
+                  annotation_font_color=C["spot"], annotation_position="top left")
     fig.update_layout(barmode="overlay")
     fig = _layout(fig, f"権利行使価格別 建玉残高（{label(contract)}）", 420, "権利行使価格（円）", "建玉残高（枚）", True)
     fig.update_xaxes(range=list(xrange))
@@ -149,7 +150,7 @@ def gamma_map_chart(strike_table, spot, candidates, xrange):
     fig.add_vrect(x0=spot - gm.CANDIDATE_WINDOW_YEN, x1=spot + gm.CANDIDATE_WINDOW_YEN,
                   fillcolor=C["cand"], opacity=0.07, line_width=0)
     fig.add_vline(x=spot, line_color=C["spot"], line_dash="dash", annotation_text=f"現在値 {spot:,.0f}",
-                  annotation_font_color=C["spot"], annotation_position="top")
+                  annotation_font_color=C["spot"], annotation_position="top left")
     for _, r in candidates.iterrows():
         fig.add_annotation(x=r["strike"], y=r["hedge"] / 1000, text=f"候補{int(r['rank'])}", showarrow=True,
                            arrowhead=2, arrowcolor=C["cand"], font=dict(color=C["cand"], size=11), ay=-28)

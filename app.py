@@ -14,6 +14,7 @@ import streamlit as st
 
 # 2026-10-04追加分（ファイル名が日付プレフィックス付きのためimportlibで読み込む）
 views = importlib.import_module("261004_views")
+importlib.import_module("261004_chart_style").install()  # 全グラフの凡例を白文字・透明背景にする共通設定
 
 st.set_page_config(
     page_title="日経225オプション 建玉残高ダッシュボード",
@@ -127,7 +128,7 @@ def oi_bar_chart(df, product, contract, position_strikes=None, price_range=None)
             if strike:
                 fig.add_vline(x=strike, line_color=COLORS["position"], line_width=2, line_dash="dash",
                               annotation_text=label, annotation_font_color=COLORS["position"],
-                              annotation_position="top")
+                              annotation_position="top left")
 
     xaxis_opts = dict(gridcolor=COLORS["grid"])
     if price_range:
@@ -143,7 +144,7 @@ def oi_bar_chart(df, product, contract, position_strikes=None, price_range=None)
         paper_bgcolor=COLORS["bg"],
         plot_bgcolor=COLORS["panel"],
         font=dict(color=COLORS["text"]),
-        legend=dict(orientation="h", y=1.08),
+        legend=dict(orientation="h", x=1, xanchor="right", y=1.08),  # 右寄せ: ポジション線のラベルと重ならないように
         xaxis=xaxis_opts,
         yaxis=dict(gridcolor=COLORS["grid"]),
         margin=dict(l=50, r=20, t=70, b=40),
