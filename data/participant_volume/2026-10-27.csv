@@ -1,0 +1,72 @@
+report_date,session,contract,put_call,strike,rank,participant_code,participant_en,participant_jp,volume
+20261027,day,2611,Put,62500,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,29
+20261027,day,2611,Put,62500,2,11714,JPMorgan Securities Japan,ＪＰモルガン証券,7
+20261027,day,2611,Put,62500,3,11788,Societe Generale Securities Japan,ソシエテＧ証券,2
+20261027,day,2611,Put,63000,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,112
+20261027,day,2611,Put,63000,2,12400,The Nomura Securities,野村証券,25
+20261027,day,2611,Put,63000,3,11256,SBI SECURITIES,ＳＢＩ証券,14
+20261027,day,2611,Put,63000,4,12800,Morgan Stanley MUFG Securities,モルガンＭＵＦＧ証券,10
+20261027,day,2611,Put,63000,5,11788,Societe Generale Securities Japan,ソシエテＧ証券,6
+20261027,day,2611,Put,63000,6,11056,ANDO SECURITIES,安藤証券,4
+20261027,day,2611,Put,63000,6,12428,BNP Paribas Securities(Japan)Limited,ＢＮＰパリバ証券,4
+20261027,day,2611,Put,63000,8,12795,Interactive Brokers Securities Japan,インタラクティブ証券,3
+20261027,day,2611,Put,63000,9,11060,Mitsubishi UFJ eSmart Securities,三菱ＵＦＪｅスマート,2
+20261027,day,2611,Put,63000,9,12057,Rakuten Securities,楽天証券,2
+20261027,day,2611,Put,63000,9,12288,PhillipCapital Japan,フィリップ・キャ証券,2
+20261027,day,2611,Put,63000,12,12330,Monex,マネックス証券,1
+20261027,day,2611,Put,63000,12,12560,MATSUI SECURITIES,松井証券,1
+20261027,day,2611,Put,63500,1,11256,SBI SECURITIES,ＳＢＩ証券,1
+20261027,day,2611,Put,63500,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,1
+20261027,day,2611,Call,64250,1,11560,Goldman Sachs Japan,ゴールドマン証券,1
+20261027,day,2611,Call,64250,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,1
+20261027,day,2611,Call,64000,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,56
+20261027,day,2611,Call,64000,2,11714,JPMorgan Securities Japan,ＪＰモルガン証券,9
+20261027,day,2611,Call,64000,3,11060,Mitsubishi UFJ eSmart Securities,三菱ＵＦＪｅスマート,5
+20261027,day,2611,Call,64000,3,12057,Rakuten Securities,楽天証券,5
+20261027,day,2611,Call,64000,3,12328,SMBC Nikko Securities,ＳＭＢＣ日興証券,5
+20261027,day,2611,Call,64000,6,11256,SBI SECURITIES,ＳＢＩ証券,3
+20261027,day,2611,Call,64000,6,12330,Monex,マネックス証券,3
+20261027,day,2611,Call,64000,6,12560,MATSUI SECURITIES,松井証券,3
+20261027,day,2611,Call,64000,9,11056,ANDO SECURITIES,安藤証券,1
+20261027,day,2611,Call,64000,9,12336,Nissan Securities,日産証券,1
+20261027,day,2611,Call,64000,9,12428,BNP Paribas Securities(Japan)Limited,ＢＮＰパリバ証券,1
+20261027,day,2611,Call,63500,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,28
+20261027,day,2611,Call,63500,2,12792,BofA Securities Japan,ビーオブエー証券,12
+20261027,day,2611,Call,63500,3,12328,SMBC Nikko Securities,ＳＭＢＣ日興証券,10
+20261027,day,2611,Call,63500,4,12057,Rakuten Securities,楽天証券,3
+20261027,day,2611,Call,63500,5,11256,SBI SECURITIES,ＳＢＩ証券,2
+20261027,day,2611,Call,63500,6,12560,MATSUI SECURITIES,松井証券,1
+20261027,day,2611,Call,63000,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,10
+20261027,day,2611,Call,63000,2,11256,SBI SECURITIES,ＳＢＩ証券,3
+20261027,day,2611,Call,63000,2,12330,Monex,マネックス証券,3
+20261027,day,2611,Call,63000,4,12057,Rakuten Securities,楽天証券,1
+20261027,day,2611,Call,63000,4,12428,BNP Paribas Securities(Japan)Limited,ＢＮＰパリバ証券,1
+20261027,day,2611,Call,63000,4,12560,MATSUI SECURITIES,松井証券,1
+20261027,day,2611,Call,63000,4,12795,Interactive Brokers Securities Japan,インタラクティブ証券,1
+20261027,night,2611,Put,62250,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,2
+20261027,night,2611,Put,62250,2,11256,SBI SECURITIES,ＳＢＩ証券,1
+20261027,night,2611,Put,62250,2,12428,BNP Paribas Securities(Japan)Limited,ＢＮＰパリバ証券,1
+20261027,night,2611,Put,62500,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,5
+20261027,night,2611,Put,62500,2,12560,MATSUI SECURITIES,松井証券,2
+20261027,night,2611,Put,62500,3,11256,SBI SECURITIES,ＳＢＩ証券,1
+20261027,night,2611,Put,62625,1,11256,SBI SECURITIES,ＳＢＩ証券,1
+20261027,night,2611,Put,62625,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,1
+20261027,night,2611,Put,63000,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,12
+20261027,night,2611,Put,63000,2,12057,Rakuten Securities,楽天証券,11
+20261027,night,2611,Put,63000,3,11256,SBI SECURITIES,ＳＢＩ証券,5
+20261027,night,2611,Put,63000,4,12428,BNP Paribas Securities(Japan)Limited,ＢＮＰパリバ証券,3
+20261027,night,2611,Put,63000,5,11788,Societe Generale Securities Japan,ソシエテＧ証券,2
+20261027,night,2611,Put,63000,6,12560,MATSUI SECURITIES,松井証券,1
+20261027,night,2611,Call,64000,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,8
+20261027,night,2611,Call,64000,2,12057,Rakuten Securities,楽天証券,2
+20261027,night,2611,Call,64000,3,11060,Mitsubishi UFJ eSmart Securities,三菱ＵＦＪｅスマート,1
+20261027,night,2611,Call,64000,3,11256,SBI SECURITIES,ＳＢＩ証券,1
+20261027,night,2611,Call,64000,3,12410,Barclays Securities Japan,バークレイズ証券,1
+20261027,night,2611,Call,64000,3,12428,BNP Paribas Securities(Japan)Limited,ＢＮＰパリバ証券,1
+20261027,night,2611,Call,63500,1,12057,Rakuten Securities,楽天証券,1
+20261027,night,2611,Call,63500,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,1
+20261027,night,2611,Call,63000,1,12479,ABN AMRO Clearing Tokyo,ＡＢＮクリアリン証券,20
+20261027,night,2611,Call,63000,2,11714,JPMorgan Securities Japan,ＪＰモルガン証券,10
+20261027,night,2611,Call,63000,3,12428,BNP Paribas Securities(Japan)Limited,ＢＮＰパリバ証券,5
+20261027,night,2611,Call,63000,4,12057,Rakuten Securities,楽天証券,2
+20261027,night,2611,Call,63000,5,11256,SBI SECURITIES,ＳＢＩ証券,1
